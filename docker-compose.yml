@@ -1,0 +1,15 @@
+services:
+  web:
+    build: ./apps/web
+    image: ai-playground-web
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    command: ["node", "server.js"]
+
+# Reuse the Postgres container started by the traffic-monitor stack.
+networks:
+  default:
+    name: traffic-monitor_default
+    external: true
