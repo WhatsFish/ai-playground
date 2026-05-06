@@ -34,7 +34,7 @@ export default function RootLayout({
         <Script
           defer
           src="http://20.89.176.30:3000/script.js"
-          data-website-id="3816fe35-fc57-4516-81b7-25fcf6856c9f"
+          data-website-id="5b77c34e-bcd9-445b-a2cb-32f8a190e16d"
           strategy="afterInteractive"
         />
       </body>
