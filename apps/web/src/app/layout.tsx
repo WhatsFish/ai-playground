@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -29,6 +30,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        {/* Umami analytics — same instance used by the blog. */}
+        <Script
+          defer
+          src="http://20.89.176.30:3000/script.js"
+          data-website-id="3816fe35-fc57-4516-81b7-25fcf6856c9f"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
