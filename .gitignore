@@ -1,0 +1,13 @@
+# Local secrets
+.env
+.env.local
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+
+# OS / editor noise
+.DS_Store
+*.swp

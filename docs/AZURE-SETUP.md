@@ -34,13 +34,39 @@ This gives you a Foundry workspace where model deployments live.
 - Deployment type: **Serverless API** (a.k.a. "pay-as-you-go endpoint")
 - Deployment name: keep the default (you'll use it as the `model` field)
 - Accept the per-token pricing prompt
-- After deployment finishes, click the deployment → copy:
-  - **Target URI** (looks like `https://<project>-xxx.<region>.inference.ai.azure.com`)
-  - **Key**
+- After deployment finishes, click the deployment → copy the **Target URI**
+  (looks like `https://<project>-xxx.<region>.inference.ai.azure.com`).
+  We do **not** need the API key — see step 3b.
 
 > If the model you want isn't available in your region, either change the hub's
 > region or pick another model. The unified Inference API is the same shape
 > regardless.
+
+## 3b. Wire up Managed Identity (no API key)
+
+We authenticate from the VM using its system-assigned managed identity instead
+of a plaintext key.
+
+1. **VM → Identity → System assigned → Status: On → Save**.
+   _Done._
+2. **AI Foundry project (or hub) → Access control (IAM) → Add role assignment**
+   - Role: **Cognitive Services User** (least-privilege; only inference)
+   - Assign access to: **Managed identity** → pick the VM
+   - Save.
+   _Done._
+
+From now on, any process running as the VM (including our Docker container,
+as long as it can reach `169.254.169.254`) can call the inference endpoint
+with no secrets in `.env`.
+
+Verify from the VM:
+```bash
+# Get a token (sanity check; the SDK does this automatically)
+curl -sH "Metadata: true" \
+  "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://cognitiveservices.azure.com/" \
+  | jq -r .access_token | cut -c1-20 ; echo
+```
+A non-empty token prefix means MI is working.
 
 ## 4. Create the GitHub OAuth app
 - GitHub → **Settings** → **Developer settings** → **OAuth Apps** → **New**
@@ -57,8 +83,8 @@ app for production rather than editing the dev one.
 
 ```
 AZURE_AI_ENDPOINT=<Target URI from step 3>
-AZURE_AI_API_KEY=<Key from step 3>
 AZURE_AI_DEFAULT_MODEL=<deployment name from step 3>
+# No AZURE_AI_API_KEY — we use the VM's managed identity (step 3b).
 
 NEXTAUTH_URL=http://20.89.176.30/chat
 NEXTAUTH_SECRET=<openssl rand -hex 32>
@@ -102,15 +128,15 @@ az ml online-endpoint list --workspace-name aifh-playground -g rg-ai-playground
 ```
 
 ## 9. What to copy back to me
-After the portal steps you should have these four values; paste them and I'll
+After the portal steps you should have these values; paste them and I'll
 wire up the app:
 
 ```
 AZURE_AI_ENDPOINT=
-AZURE_AI_API_KEY=
 AZURE_AI_DEFAULT_MODEL=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 ```
 
-(Or just paste them into the `.env` file directly and tell me you're done.)
+(Or just paste them into the `.env` file directly and tell me you're done.
+No Azure key needed — managed identity covers that.)

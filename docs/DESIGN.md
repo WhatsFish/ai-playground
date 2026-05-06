@@ -33,6 +33,8 @@
   Next.js
      ├── Auth.js (GitHub OAuth)  ─── stores sessions in Postgres
      ├── /api/chat (server route) ── streams ── Azure AI Inference endpoint
+     │        │
+     │        └─ auth: DefaultAzureCredential ── IMDS ── Entra ID token
      └── Prisma ─► Postgres (`ai_playground` DB) — users, conversations, messages
 ```
 
@@ -115,9 +117,10 @@ Streaming protocol: **SSE** (text/event-stream). The Vercel AI SDK
 `.env` (server-only):
 
 ```
-# Azure AI
+# Azure AI — NO key. The VM's system-assigned managed identity holds the
+# `Cognitive Services User` role on the AI Foundry project, and
+# DefaultAzureCredential picks it up at runtime via IMDS.
 AZURE_AI_ENDPOINT=https://<project>.<region>.inference.ai.azure.com
-AZURE_AI_API_KEY=...
 AZURE_AI_DEFAULT_MODEL=Llama-3.3-70B-Instruct
 
 # Auth
@@ -131,8 +134,8 @@ ALLOWED_GITHUB_LOGINS=WhatsFish
 DATABASE_URL=postgresql://ai_pg:<pw>@db:5432/ai_playground
 ```
 
-Nothing prefixed with `NEXT_PUBLIC_` exists in this app. Keys never reach
-the browser.
+The only real "secret" left in `.env` is the GitHub OAuth client secret +
+NextAuth signing secret + Postgres password. All Azure AI auth is identity-based.
 
 ## 8. Deployment
 
@@ -142,6 +145,10 @@ the browser.
 - The Next.js container binds `127.0.0.1:3001` only.
 - A new Nginx location block `/chat/` reverse-proxies to `http://127.0.0.1:3001/`
   with WebSocket / SSE headers (`proxy_buffering off;`).
+- For Managed Identity to work inside the container, IMDS
+  (`169.254.169.254`) must be reachable. The default Docker bridge network on
+  Linux already allows this; if a future setup blocks it, fall back to
+  `network_mode: host`.
 - Compose file:
 
 ```yaml
@@ -151,7 +158,6 @@ services:
     env_file: .env
     ports: ["127.0.0.1:3001:3000"]
     restart: unless-stopped
-    depends_on: [db]
 networks:
   default:
     name: traffic-monitor_default
@@ -163,7 +169,12 @@ service.)
 
 ## 9. Security Notes
 
-- **Keys**: only in `.env`, gitignored, owner-readable.
+- **Azure AI auth**: zero-secret. The VM's system-assigned managed identity
+  has the `Cognitive Services User` role on the AI Foundry project; tokens
+  are fetched on-demand via IMDS. Revoke the role assignment to instantly
+  cut off access.
+- **Other secrets**: GitHub client secret, NextAuth secret, Postgres password
+  live only in `.env`, gitignored, owner-readable.
 - **CORS**: API routes are same-origin only.
 - **CSRF**: Auth.js handles OAuth CSRF; chat POST requires the session cookie
   (which is `SameSite=Lax`).
